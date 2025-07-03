@@ -105,7 +105,7 @@ void l2e_cosine_kernel_vector_3d(
   }
 }
 
-PYBIND11_MODULE(cosine_kernel_helper, m) {
+PYBIND11_MODULE(_cosine_kernel_helper, m) {
   m.def("e2l_cosine_kernel_vector_3d", &e2l_cosine_kernel_vector_3d);
   m.def("l2e_cosine_kernel_vector_3d", &l2e_cosine_kernel_vector_3d);
 }
