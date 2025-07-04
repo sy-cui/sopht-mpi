@@ -1,6 +1,7 @@
 """MPI-supported virtual boundary forcing for flow-body feedback."""
 from numba import njit
 import numpy as np
+from numba.cuda import local
 from sopht.numeric.eulerian_grid_ops.stencil_ops_2d.elementwise_ops_2d import (
     gen_set_fixed_val_pyst_kernel_2d,
 )
@@ -16,6 +17,10 @@ from sopht_mpi.numeric.immersed_boundary_ops.EulerianLagrangianGridCommunicatorM
 from sopht_mpi.utils.mpi_utils_2d import MPILagrangianFieldCommunicator2D
 from sopht_mpi.utils.mpi_utils_3d import MPILagrangianFieldCommunicator3D
 from mpi4py import MPI
+
+from sopht_mpi.numeric.immersed_boundary_ops._cosine_kernel_helper import (
+    e2l_cosine_kernel_vector_3d, l2e_cosine_kernel_vector_3d
+)
 
 
 class VirtualBoundaryForcingMPI:
@@ -71,6 +76,7 @@ class VirtualBoundaryForcingMPI:
         if grid_dim != 2 and grid_dim != 3:
             raise ValueError("Invalid grid dimensions for virtual boundary forcing!")
         self.grid_dim = grid_dim
+        self.dx = dx
         self.virtual_boundary_stiffness_coeff = virtual_boundary_stiffness_coeff
         self.virtual_boundary_damping_coeff = virtual_boundary_damping_coeff
         self.time = start_time
@@ -83,6 +89,7 @@ class VirtualBoundaryForcingMPI:
         # these are rather invariant hence pushed to fixed kwargs
         if eul_grid_coord_shift is None:
             eul_grid_coord_shift = self.eul_grid_real_t(dx / 2)
+        self.eul_grid_coord_shift = eul_grid_coord_shift
         self.interp_kernel_width = interp_kernel_width
         if interp_kernel_width is None:
             self.interp_kernel_width = 2
@@ -199,23 +206,23 @@ class VirtualBoundaryForcingMPI:
             )
 
     def _init_local_buffers(self, num_lag_nodes):
-        self.local_nearest_eul_grid_index_to_lag_grid = np.empty(
-            (self.grid_dim, num_lag_nodes), dtype=int
-        )
-        eul_grid_support_of_lag_grid_shape = (
-            (self.grid_dim,)
-            + (2 * self.interp_kernel_width,) * self.grid_dim
-            + (num_lag_nodes,)
-        )
-        self.local_local_eul_grid_support_of_lag_grid = np.empty(
-            eul_grid_support_of_lag_grid_shape, dtype=self.lag_grid_real_t
-        )
-        interp_weights_shape = (2 * self.interp_kernel_width,) * self.grid_dim + (
-            num_lag_nodes,
-        )
-        self.local_interp_weights = np.empty(
-            interp_weights_shape, dtype=self.lag_grid_real_t
-        )
+        # self.local_nearest_eul_grid_index_to_lag_grid = np.empty(
+        #     (self.grid_dim, num_lag_nodes), dtype=int
+        # )
+        # eul_grid_support_of_lag_grid_shape = (
+        #     (self.grid_dim,)
+        #     + (2 * self.interp_kernel_width,) * self.grid_dim
+        #     + (num_lag_nodes,)
+        # )
+        # self.local_local_eul_grid_support_of_lag_grid = np.empty(
+        #     eul_grid_support_of_lag_grid_shape, dtype=self.lag_grid_real_t
+        # )
+        # interp_weights_shape = (2 * self.interp_kernel_width,) * self.grid_dim + (
+        #     num_lag_nodes,
+        # )
+        # self.local_interp_weights = np.empty(
+        #     interp_weights_shape, dtype=self.lag_grid_real_t
+        # )
         self.local_lag_grid_flow_velocity_field = np.zeros(
             (self.grid_dim, num_lag_nodes), dtype=self.lag_grid_real_t
         )
@@ -359,24 +366,32 @@ class VirtualBoundaryForcingMPI:
 
         # Start working on the local chunks of data
         # 1. Find Eulerian grid local support of the Lagrangian grid
-        self.eul_lag_grid_communicator.local_eulerian_grid_support_of_lagrangian_grid_kernel(
-            local_eul_grid_support_of_lag_grid=self.local_local_eul_grid_support_of_lag_grid,
-            nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
-            lag_positions=self.local_lag_grid_position_field,
-        )
-
-        # 2. Compute interpolation weights based on local Eulerian grid support
-        self.eul_lag_grid_communicator.interpolation_weights_kernel(
-            interp_weights=self.local_interp_weights,
-            local_eul_grid_support_of_lag_grid=self.local_local_eul_grid_support_of_lag_grid,
-        )
-
-        # 3. Interpolate Eulerian flow velocity onto the Lagrangian grid
-        self.eul_lag_grid_communicator.eulerian_to_lagrangian_grid_interpolation_kernel(
-            lag_grid_field=self.local_lag_grid_flow_velocity_field,
-            eul_grid_field=local_eul_grid_velocity_field,
-            interp_weights=self.local_interp_weights,
-            nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
+        # self.eul_lag_grid_communicator.local_eulerian_grid_support_of_lagrangian_grid_kernel(
+        #     local_eul_grid_support_of_lag_grid=self.local_local_eul_grid_support_of_lag_grid,
+        #     nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
+        #     lag_positions=self.local_lag_grid_position_field,
+        # )
+        #
+        # # 2. Compute interpolation weights based on local Eulerian grid support
+        # self.eul_lag_grid_communicator.interpolation_weights_kernel(
+        #     interp_weights=self.local_interp_weights,
+        #     local_eul_grid_support_of_lag_grid=self.local_local_eul_grid_support_of_lag_grid,
+        # )
+        #
+        # # 3. Interpolate Eulerian flow velocity onto the Lagrangian grid
+        # self.eul_lag_grid_communicator.eulerian_to_lagrangian_grid_interpolation_kernel(
+        #     lag_grid_field=self.local_lag_grid_flow_velocity_field,
+        #     eul_grid_field=local_eul_grid_velocity_field,
+        #     interp_weights=self.local_interp_weights,
+        #     nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
+        # )
+        e2l_cosine_kernel_vector_3d(
+            self.local_lag_grid_flow_velocity_field,
+            local_eul_grid_velocity_field,
+            self.local_lag_grid_position_field,
+            self.dx,
+            self.eul_grid_coord_shift,
+            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift
         )
 
         # 4. Compute velocity mismatch between flow and body on Lagrangian grid
@@ -421,11 +436,22 @@ class VirtualBoundaryForcingMPI:
             global_lag_grid_velocity_field,
         )
         # 2. Interpolate penalty forcing from Lagrangian onto the Eulerian grid
-        self.eul_lag_grid_communicator.lagrangian_to_eulerian_grid_interpolation_kernel(
-            eul_grid_field=local_eul_grid_forcing_field,
-            lag_grid_field=self.local_lag_grid_forcing_field,
-            interp_weights=self.local_interp_weights,
-            nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
+        # self.eul_lag_grid_communicator.lagrangian_to_eulerian_grid_interpolation_kernel(
+        #     eul_grid_field=local_eul_grid_forcing_field,
+        #     lag_grid_field=self.local_lag_grid_forcing_field,
+        #     interp_weights=self.local_interp_weights,
+        #     nearest_eul_grid_index_to_lag_grid=self.local_nearest_eul_grid_index_to_lag_grid,
+        # )
+        l2e_cosine_kernel_vector_3d(
+            local_eul_grid_forcing_field,
+            self.local_lag_grid_forcing_field,
+            global_lag_grid_position_field,
+            self.dx,
+            self.eul_grid_coord_shift,
+            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift
+        )
+        self.eul_lag_grid_communicator.eulerian_grid_ghost_sum(
+            local_field=local_eul_grid_forcing_field
         )
 
     def compute_interaction_force_on_eul_and_lag_grid_with_eul_grid_forcing_reset(
