@@ -1,6 +1,6 @@
 # Poetry pyproject.toml: https://python-poetry.org/docs/pyproject/
 [build-system]
-requires = ["poetry_core>=1.0.0"]
+requires = ["poetry_core", "setuptools", "pybind11", "numpy"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
@@ -16,6 +16,13 @@ repository = "https://github.com/fankiat/sopht-mpi"
 packages = [
     { include = "sopht_mpi" }
 ]
+include = [
+    {path = "sopht_mpi/numeric/immersed_boundary_ops/*.so", format = "wheel"}
+]
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = true
 
 [tool.poetry.dependencies]
 python = ">=3.8,<3.11"
