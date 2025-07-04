@@ -11,5 +11,8 @@ extensions = [
     )
 ]
 
+
 def build(setup_kwargs):
-    setup_kwargs.update({"ext_modules": extensions, "cmdclass": {"build_ext": build_ext}})
+    setup_kwargs.update(
+        {"ext_modules": extensions, "cmdclass": {"build_ext": build_ext}}
+    )

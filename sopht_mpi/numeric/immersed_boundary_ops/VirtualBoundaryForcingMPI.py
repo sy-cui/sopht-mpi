@@ -19,7 +19,8 @@ from sopht_mpi.utils.mpi_utils_3d import MPILagrangianFieldCommunicator3D
 from mpi4py import MPI
 
 from sopht_mpi.numeric.immersed_boundary_ops._cosine_kernel_helper import (
-    e2l_cosine_kernel_vector_3d, l2e_cosine_kernel_vector_3d
+    e2l_cosine_kernel_vector_3d,
+    l2e_cosine_kernel_vector_3d,
 )
 
 
@@ -391,7 +392,7 @@ class VirtualBoundaryForcingMPI:
             self.local_lag_grid_position_field,
             self.dx,
             self.eul_grid_coord_shift,
-            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift
+            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift,
         )
 
         # 4. Compute velocity mismatch between flow and body on Lagrangian grid
@@ -448,7 +449,7 @@ class VirtualBoundaryForcingMPI:
             global_lag_grid_position_field,
             self.dx,
             self.eul_grid_coord_shift,
-            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift
+            self.eul_lag_grid_communicator.mpi_local_substart_coord_shift,
         )
         self.eul_lag_grid_communicator.eulerian_grid_ghost_sum(
             local_field=local_eul_grid_forcing_field
