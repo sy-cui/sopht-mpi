@@ -1,7 +1,6 @@
 """MPI-supported virtual boundary forcing for flow-body feedback."""
 from numba import njit
 import numpy as np
-from numba.cuda import local
 from sopht.numeric.eulerian_grid_ops.stencil_ops_2d.elementwise_ops_2d import (
     gen_set_fixed_val_pyst_kernel_2d,
 )
