@@ -77,7 +77,7 @@ void l2e_cosine_kernel_vector_3d(
   auto lag_field = lagrangian_grid_field.unchecked<2>();
   auto lag_pos = lag_positions.unchecked<2>();
 
-  double cosine_prefac{std::pow(0.25, 3)}, idx{1.0 / dx}, hpi{0.5 * PI};
+  double cosine_prefac{std::pow(0.25 / dx, 3)}, idx{1.0 / dx}, hpi{0.5 * PI};
   double interp_weight;  // interpolation weight
   double rx, ry, rz;     // arguments to the cosine kernel [-2, 2]
   double ax, ay, az;     // Increments to lagrangian field

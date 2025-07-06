@@ -446,7 +446,7 @@ class VirtualBoundaryForcingMPI:
         l2e_cosine_kernel_vector_3d(
             local_eul_grid_forcing_field,
             self.local_lag_grid_forcing_field,
-            global_lag_grid_position_field,
+            self.local_lag_grid_position_field,
             self.dx,
             self.eul_grid_coord_shift,
             self.eul_lag_grid_communicator.mpi_local_substart_coord_shift,
